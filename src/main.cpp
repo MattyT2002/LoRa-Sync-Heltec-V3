@@ -9,4 +9,7 @@ void setup() {
 
 void loop() {
     ble.loop();  // Run the BLE service
+    
+    ble.sendMessageToUser("hello LoRa Sync this is Heltec LoRa 32 BLE");
+    delay(5000);
 }

@@ -8,16 +8,16 @@ void BLE::MyServerCallbacks::onConnect(BLEServer* pServer) {
 void BLE::MyServerCallbacks::onDisconnect(BLEServer* pServer) {
     ble.deviceConnected = false;
     Serial.println("Device disconnected!");
-    BLEDevice::startAdvertising();  // Restart advertising after disconnect
+    BLEDevice::startAdvertising();  // Restart advertising for new connections
 }
 
-void BLE::MyCallbacks::onWrite(BLECharacteristic* pCharacteristic) {
+void BLE::MyServerCallbacks::onWrite(BLECharacteristic* pCharacteristic) {
     ble.receivedMessage = String(pCharacteristic->getValue().c_str());
     Serial.println("Received: " + ble.receivedMessage);
 
     Serial.println("Sending: " + ble.receivedMessage);
     pCharacteristic->setValue(ble.receivedMessage.c_str());
-    pCharacteristic->notify();  // Notify connected devices
+    pCharacteristic->notify();  // Notify connected client
 }
 
 void BLE::begin(const char* deviceName) {
@@ -26,7 +26,10 @@ void BLE::begin(const char* deviceName) {
 
     BLEDevice::init(deviceName);
     pServer = BLEDevice::createServer();
-    pServer->setCallbacks(new MyServerCallbacks(*this));
+
+    // Use the unified MyServerCallbacks class
+    MyServerCallbacks* callbacks = new MyServerCallbacks(*this);
+    pServer->setCallbacks(callbacks);
 
     BLEService* pService = pServer->createService(SERVICE_UUID);
     pCharacteristic = pService->createCharacteristic(
@@ -36,24 +39,27 @@ void BLE::begin(const char* deviceName) {
         BLECharacteristic::PROPERTY_NOTIFY
     );
 
-    // Add BLE2902 descriptor to enable notifications
     pCharacteristic->addDescriptor(new BLE2902());
-
-    // Pass the instance of BLE to MyCallbacks
-    pCharacteristic->setCallbacks(new MyCallbacks(*this));
+    pCharacteristic->setCallbacks(callbacks);  // Same callback for characteristic events
     pService->start();
 
     BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
     pAdvertising->addServiceUUID(SERVICE_UUID);
-    pAdvertising->setScanResponse(true);
-    pAdvertising->setMinPreferred(0x06);
-    pAdvertising->setMinPreferred(0x12);
-
     BLEDevice::startAdvertising();
+
     Serial.println("BLE is now advertising...");
 }
 
 void BLE::loop() {
-    // You can add additional logic here if needed, like handling other tasks
-    delay(10);
+    delay(1000);
+}
+
+void BLE::sendMessageToUser(const String& message) {
+    if (deviceConnected) {
+        Serial.println("Sending message to web app: " + message);
+        pCharacteristic->setValue(message.c_str());
+        pCharacteristic->notify();
+    } else {
+        Serial.println("No device connected, unable to send message.");
+    }
 }
