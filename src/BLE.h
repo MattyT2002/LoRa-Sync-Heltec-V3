@@ -11,14 +11,14 @@
 #define CHARACTERISTIC_UUID "fedcba98-4321-6789-4321-098765fedcba"
 
 class BLE {
-public:
-    BLEServer* pServer = nullptr;
-    BLECharacteristic* pCharacteristic = nullptr;
-    bool deviceConnected = false;  // Tracks connection status
-    String receivedMessage = "";  
+    public:
+        BLEServer* pServer = nullptr;
+        BLECharacteristic* pCharacteristic = nullptr;
+        bool deviceConnected = false;  // Tracks connection status
+        String receivedMessage = "";  
 
-    // Unified callback class handling both server & characteristic events
-    class MyServerCallbacks : public BLEServerCallbacks, public BLECharacteristicCallbacks {
+        // Unified callback class handling both server & characteristic events
+        class MyServerCallbacks : public BLEServerCallbacks, public BLECharacteristicCallbacks {
     private:
         BLE& ble;  // Reference to BLE instance
 
