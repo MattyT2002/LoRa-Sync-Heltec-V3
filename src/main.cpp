@@ -9,7 +9,7 @@
 BLE ble;
 
 
-LoRaMesh meshNode("NODE_A", 1);
+LoRaMesh meshNode("home", 5);
 
 
 void setup()
@@ -31,6 +31,7 @@ void loop()
       lastBroadcast = millis();
   }
 
+    meshNode.listenForPackets();
   // LoRa reception is handled in the background via the callback function
   // RadioLib is handling the interrupt-driven receive automatically.
 
