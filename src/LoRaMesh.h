@@ -4,23 +4,12 @@
 #include <Arduino.h>
 #include <RadioLib.h>
 #include <vector>
+#include "Config.h" // Include the configuration file
+
+extern Module radio;
 
 
-extern SX1262 LoRaRadio;
 
-#define LORA_SCK 9
-#define LORA_MISO 11
-#define LORA_MOSI 10
-#define LORA_NSS 8  // Chip Select (SS)
-#define LORA_RST 12
-#define LORA_DIO0 14  // Interrupt (DIO0)
-#define LORA_BUSY 13  
-
-#define RF_FREQUENCY 868.0  // Adjust based on region (868E6 for EU, 915E6 for US)
-#define TX_OUTPUT_POWER 14  // LoRa transmit power (dBm)
-#define LORA_BANDWIDTH 0    // 0 = 125kHz, 1 = 250kHz, 2 = 500kHz
-#define LORA_SPREADING_FACTOR 7
-#define LORA_CODINGRATE 1
 
 
 // Node Entry Structure
@@ -43,6 +32,8 @@ public:
     void updateDirectory(String senderID, int senderNumber, float snr);
     void printDirectory();
     void sendNodeDirectory();
+    void sendMessage(String message);
+    void sendNodeDirectoryToGUI();
 
     static const unsigned long BROADCAST_INTERVAL = 10000;  // 10 seconds
     static const unsigned long PRINT_INTERVAL = 20000;      // 20 seconds
@@ -55,5 +46,6 @@ private:
 
     int state; // current state of the radio
 
+    static void onReceive(uint8_t *buffer, uint16_t size);
 };
 #endif  // LORAMESH_H

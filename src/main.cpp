@@ -1,21 +1,21 @@
 #include "BLE.h"
-
+#include "Config.h"
 #include "LoRaMesh.h"
 #define RH_HAVE_SERIAL
 #define LED 9
 #define N_NODES 2
 
 // Create an instance of the BLE class
-BLE ble;
 
 
-LoRaMesh meshNode("home", 5);
+
+LoRaMesh meshNode(NODE_name, NODE_number);
 
 
 void setup()
 {
-  ble.begin();  // Initialize BLE service
-  //node.setupLoRa();
+  
+
   meshNode.setupLoRa();
 
 }
@@ -39,5 +39,6 @@ void loop()
   if (millis() - lastPrint > LoRaMesh::PRINT_INTERVAL) {
       meshNode.printDirectory();
       lastPrint = millis();
+      meshNode.sendNodeDirectoryToGUI(); 
   }
 }

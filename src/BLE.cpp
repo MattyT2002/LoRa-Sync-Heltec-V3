@@ -56,10 +56,16 @@ void BLE::loop() {
 
 void BLE::sendMessageToUser(const String& message) {
     if (deviceConnected) {
-        Serial.println("Sending message to web app: " + message);
-        pCharacteristic->setValue(message.c_str());
-        pCharacteristic->notify();
+        Serial.println("Sending message to web app...");
+        int chunkSize = 100;  // Max BLE characteristic size varies, so we send in chunks
+        for (int i = 0; i < message.length(); i += chunkSize) {
+            String chunk = message.substring(i, i + chunkSize);
+            pCharacteristic->setValue(chunk.c_str());
+            pCharacteristic->notify();
+            delay(50);  // Small delay to avoid flooding
+        }
     } else {
         Serial.println("No device connected, unable to send message.");
     }
 }
+

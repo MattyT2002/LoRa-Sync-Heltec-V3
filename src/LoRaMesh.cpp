@@ -1,9 +1,10 @@
 #include "LoRaMesh.h"
+#include "BLE.h"
 
-SX1262 LoRaRadio = new Module(8, 14, 12, 13); // NSS, DIO0, RESET, BUSY
+SX1262 LoRaRadio = new Module(LORA_NSS, LORA_DIO0, LORA_RST, LORA_DIO1); // NSS, DIO0, RESET, DIO1 pins
 // Global instance for callback function access
 LoRaMesh *instancePtr = nullptr;
-
+BLE ble;
 LoRaMesh::LoRaMesh(String nodeId, int nodeNumber)
 {
     NODE_ID = nodeId;
@@ -15,10 +16,15 @@ LoRaMesh::LoRaMesh(String nodeId, int nodeNumber)
 
 void LoRaMesh::setupLoRa()
 {
+    ble.begin();  // Initialize BLE service
     Serial.begin(115200);
     // Initialize LoRa module
     Serial.print(F("[SX1262] Initializing ... "));
-    int state = LoRaRadio.begin(868.0);
+    int state = LoRaRadio.begin();
+    LoRaRadio.setBandwidth(LORA_BANDWIDTH);
+    LoRaRadio.setFrequency(LORA_FREQUENCY);
+    LoRaRadio.setCodingRate(LORA_CODING_RATE);
+    LoRaRadio.setSpreadingFactor(LORA_SPREADING_FACTOR);
     if (state == RADIOLIB_ERR_NONE)
     {
         Serial.println(F("success!"));
@@ -37,8 +43,7 @@ void LoRaMesh::setupLoRa()
     updateDirectory(NODE_ID, NODE_NUMBER, 0); // Add self to directory
 }
 
-// Sends a "HELLO" message to other nodes
-// Sends a "LoRaMeshNode" message to other nodes
+
 void LoRaMesh::sendHelloPacket()
 {
     String message = "LoRaMeshNode|" + NODE_ID + "|" + String(NODE_NUMBER);
@@ -57,6 +62,26 @@ void LoRaMesh::sendHelloPacket()
         Serial.println(state);
     }
 }
+
+void LoRaMesh::sendMessage(String message)
+{
+    Serial.print("Sending message: ");
+    Serial.println(message);
+
+    int state = LoRaRadio.transmit(message);
+
+    if (state == RADIOLIB_ERR_NONE)
+    {
+        Serial.println("Transmission successful!");
+    }
+    else
+    {
+        Serial.print("Transmission failed, error: ");
+        Serial.println(state);
+    }
+    delay(10); // Avoid collisions 
+}
+
 
 void LoRaMesh::listenForPackets()
 {
@@ -135,6 +160,36 @@ void LoRaMesh::sendNodeDirectory()
     }
 }
 
+void LoRaMesh:: sendNodeDirectoryToGUI()
+{
+    Serial.println("Sending node directory over BLE");
+
+    // Start JSON formatting
+    String jsonData = "{ \"nodes\": [";
+    bool first = true;
+    
+    // Add all nodes in the directory (including self)
+    for (const auto &entry : nodeDirectory) {
+        if (!first) jsonData += ",";
+        jsonData += "{ \"id\": \"" + entry.nodeID + "\", \"snr\": " + String(entry.snr) + " }";
+        first = false;
+    }
+    jsonData += "], \"connections\": [";
+
+    // Create connections between this node and all others
+    first = true;
+    for (const auto &entry : nodeDirectory) {
+        if (entry.nodeID != NODE_ID) {  // Avoid self-connection
+            if (!first) jsonData += ",";
+            jsonData += "{ \"from\": \"" + NODE_ID + "\", \"to\": \"" + entry.nodeID + "\", \"snr\": " + String(entry.snr) + " }";
+            first = false;
+        }
+    }
+    jsonData += "] }";
+
+    ble.sendMessageToUser(jsonData);  // Send formatted JSON over BLE
+}
+
 // Updates the node directory when a new node is discovered
 void LoRaMesh::updateDirectory(String senderID, int senderNumber, float snr)
 {
@@ -168,7 +223,7 @@ void LoRaMesh::updateDirectory(String senderID, int senderNumber, float snr)
 void LoRaMesh::printDirectory()
 {
     Serial.println("\nNode Directory:");
-
+    ble.sendMessageToUser("Node Directory:");
     if (nodeDirectory.empty())
     {
         Serial.println("No nodes in directory.");
@@ -181,5 +236,9 @@ void LoRaMesh::printDirectory()
                        " | ID: " + String(entry.senderID) +
                        " | SNR: " + String(entry.snr) +
                        " | Last Seen: " + String((millis() - entry.lastSeen) / 1000) + " sec ago");
+        ble.sendMessageToUser("Node: " + entry.nodeID +
+                              " | ID: " + String(entry.senderID) +
+                              " | SNR: " + String(entry.snr) +
+                              " | Last Seen: " + String((millis() - entry.lastSeen) / 1000) + " sec ago");
     }
 }
