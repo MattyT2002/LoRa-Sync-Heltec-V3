@@ -2,6 +2,7 @@
 #define BLE_H
 
 #include <Arduino.h>
+#include <ArduinoBLE.h>
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
