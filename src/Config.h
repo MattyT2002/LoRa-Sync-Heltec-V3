@@ -2,9 +2,12 @@
 #define CONFIG_H
 
 // Device Information
-#define NODE_number 2      
+#define NODE_number 1      
 #define NODE_name  "Home"             
 #define Chip SX1262
+
+#define BOARD_HELTEC
+//#define BOARD_NANO33BLE
 
 // LoRa Chip Pins
 #define LORA_NSS 8              // Slave Select pin
@@ -17,6 +20,9 @@
 #define LORA_BANDWIDTH 125     // Bandwidth in kHz (125, 250, or 500)
 #define LORA_SPREADING_FACTOR 7 // Spreading factor (7-12)
 #define LORA_CODING_RATE 5     // Coding rate denominator (5-8)
+#define LORA_OUTPUT_POWER 14 // Output power in dBm
 
 
+#define BROADCAST_INTERVAL 10000 // Interval to send hello packet in ms
+#define PRINT_INTERVAL 20000 // Interval to print directory in ms
 #endif

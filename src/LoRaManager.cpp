@@ -1,14 +1,23 @@
-#include "LoRaMesh.h"
-#include "BLE.h"
-
+#include "LoRaManager.h"
+#include "Config.h"
+#include <RadioLib.h>  
+#include "nodeManager.h"
 
 SX1262 LoRaRadio = new Module(LORA_NSS, LORA_DIO0, LORA_RST, LORA_DIO1); // NSS, DIO0, RESET, DIO1 pins
-
-
+NodeManager nodeManager; // NodeManager instance to manage nodes
 // Global instance for callback function access
-LoRaMesh *instancePtr = nullptr;
-BLE ble;
-LoRaMesh::LoRaMesh(String nodeId, int nodeNumber)
+LoRaManager *instancePtr = nullptr;
+
+
+
+// Node and Packet Management
+
+Packet packetManager;
+Packet recievedPacket;
+Packet msgPacket; // Packet to send
+
+
+LoRaManager::LoRaManager(String nodeId, int nodeNumber, NodeDirectory& nodeDirectory) : nodeDirectory(nodeDirectory)
 {
     NODE_ID = nodeId;
     NODE_NUMBER = nodeNumber;
@@ -17,9 +26,9 @@ LoRaMesh::LoRaMesh(String nodeId, int nodeNumber)
     instancePtr = this; // Store instance for callback use
 }
 
-void LoRaMesh::setupLoRa()
+void LoRaManager::setupLoRa()
 {
-    ble.begin();  // Initialize BLE service
+    
     Serial.begin(115200);
     // Initialize LoRa module
     Serial.print(F("[SX1262] Initializing ... "));
@@ -28,6 +37,7 @@ void LoRaMesh::setupLoRa()
     LoRaRadio.setFrequency(LORA_FREQUENCY);
     LoRaRadio.setCodingRate(LORA_CODING_RATE);
     LoRaRadio.setSpreadingFactor(LORA_SPREADING_FACTOR);
+    LoRaRadio.setOutputPower(LORA_OUTPUT_POWER); 
     if (state == RADIOLIB_ERR_NONE)
     {
         Serial.println(F("success!"));
@@ -43,13 +53,12 @@ void LoRaMesh::setupLoRa()
     }
 
     Serial.println("LoRa Mesh Node Initialized with RadioLib!");
-    updateDirectory(NODE_ID, NODE_NUMBER, 0); // Add self to directory
+    
 }
 
-
-void LoRaMesh::sendHelloPacket()
+void LoRaManager::sendHelloPacket()
 {
-    String message = "LoRaMeshNode|" + NODE_ID + "|" + String(NODE_NUMBER);
+    String message = packetManager.helloMessage();
     Serial.print("Sending message: ");
     Serial.println(message);
 
@@ -66,12 +75,14 @@ void LoRaMesh::sendHelloPacket()
     }
 }
 
-void LoRaMesh::sendMessage(String message)
+void LoRaManager::sendMessage(String message)
 {
     Serial.print("Sending message: ");
     Serial.println(message);
 
-    int state = LoRaRadio.transmit(message);
+    msgPacket = Packet(message);
+    String msg = msgPacket.messageToSend(message);
+    int state = LoRaRadio.transmit(msg);
 
     if (state == RADIOLIB_ERR_NONE)
     {
@@ -85,14 +96,14 @@ void LoRaMesh::sendMessage(String message)
     delay(10); // Avoid collisions 
 }
 
-
-void LoRaMesh::listenForPackets()
+void LoRaManager::listenForPackets()
 {
     Serial.print(F("[SX1262] Waiting for incoming transmission ... "));
 
     String str;
     int state = LoRaRadio.receive(str);
-
+    
+    recievedPacket = Packet(str);
     if (state == RADIOLIB_ERR_NONE)
     {
         Serial.println(F("success!"));
@@ -111,30 +122,20 @@ void LoRaMesh::listenForPackets()
         Serial.print(LoRaRadio.getFrequencyError());
         Serial.println(F(" Hz"));
 
-        // Check if message starts with "LoRaMeshNode|"
-        if (str.startsWith("LoRaMeshNode|"))
+        // Process received packet
+        recievedPacket = Packet(str);
+        if (recievedPacket.deserialize(str))
         {
-            Serial.println("Received LoRaMeshNode packet!");
-            Serial.println("Raw received message: [" + str + "]");
-
-            int firstSeparator = str.indexOf('|');
-            int secondSeparator = str.indexOf('|', firstSeparator + 1);
-
-            Serial.print("First Separator Position: ");
-            Serial.println(firstSeparator);
-            Serial.print("Second Separator Position: ");
-            Serial.println(secondSeparator);
-
-            if (firstSeparator != -1 && secondSeparator != -1)
-            {
-                String senderName = str.substring(firstSeparator + 1, secondSeparator);
-                int senderNumber = str.substring(secondSeparator + 1).toInt();
-                float snr = LoRaRadio.getSNR();
-                Serial.println("Extracted Sender Name: [" + senderName + "]");
-                Serial.println("Extracted Sender Number: [" + String(senderNumber) + "]");
-                updateDirectory(senderName, senderNumber, snr);
-                sendNodeDirectory();
-            }
+            Serial.println("Received valid packet!");
+            String senderName = recievedPacket.getnodeName();
+            String senderNumber = recievedPacket.getnodeNumber();
+            float snr = LoRaRadio.getSNR();
+            
+            nodeDirectory.updateNeighbourNode(senderNumber.toInt(), snr, millis());
+        }
+        else
+        {
+            Serial.println("Received invalid packet!");
         }
     }
     else if (state == RADIOLIB_ERR_RX_TIMEOUT)
@@ -150,98 +151,7 @@ void LoRaMesh::listenForPackets()
         Serial.print(F("failed, code "));
         Serial.println(state);
     }
+
 }
 
-void LoRaMesh::sendNodeDirectory()
-{
-    Serial.println("Sending node directory");
-    for (const auto &entry : nodeDirectory)
-    {
-        String message = "DIR_UPDATE|" + entry.nodeID + "|" + String(entry.senderID) + "|" + String(entry.snr);
-        LoRaRadio.transmit(message);
-        delay(50); // Avoid collisions
-    }
-}
 
-void LoRaMesh:: sendNodeDirectoryToGUI()
-{
-    Serial.println("Sending node directory over BLE");
-
-    // Start JSON formatting
-    String jsonData = "{ \"nodes\": [";
-    bool first = true;
-    
-    // Add all nodes in the directory (including self)
-    for (const auto &entry : nodeDirectory) {
-        if (!first) jsonData += ",";
-        jsonData += "{ \"id\": \"" + entry.nodeID + "\", \"snr\": " + String(entry.snr) + " }";
-        first = false;
-    }
-    jsonData += "], \"connections\": [";
-
-    // Create connections between this node and all others
-    first = true;
-    for (const auto &entry : nodeDirectory) {
-        if (entry.nodeID != NODE_ID) {  // Avoid self-connection
-            if (!first) jsonData += ",";
-            jsonData += "{ \"from\": \"" + NODE_ID + "\", \"to\": \"" + entry.nodeID + "\", \"snr\": " + String(entry.snr) + " }";
-            first = false;
-        }
-    }
-    jsonData += "] }";
-
-    ble.sendMessageToUser(jsonData);  // Send formatted JSON over BLE
-}
-
-// Updates the node directory when a new node is discovered
-void LoRaMesh::updateDirectory(String senderID, int senderNumber, float snr)
-{
-    Serial.println("updateDirectory() called with: " + senderID + ", ID: " + String(senderNumber) + ", SNR: " + String(snr));
-
-    bool found = false;
-
-    for (auto &entry : nodeDirectory)
-    {
-        if (entry.nodeID == senderID)
-        {
-            Serial.println("Node already in directory, updating SNR...");
-            entry.snr = snr;
-            entry.lastSeen = millis();
-            found = true;
-            break;
-        }
-    }
-
-    if (!found)
-    {
-        Serial.println("Adding new node to directory...");
-        nodeDirectory.push_back({senderID, senderNumber, snr, millis()});
-        Serial.println("New node added: " + senderID + " | ID: " + String(senderNumber) + " | SNR: " + String(snr));
-    }
-
-    Serial.println("Directory now contains " + String(nodeDirectory.size()) + " nodes.");
-}
-
-// Prints the directory of discovered nodes
-void LoRaMesh::printDirectory()
-{
-    Serial.println("\nNode Directory:");
-    ble.sendMessageToUser("Node Directory:");
-    if (nodeDirectory.empty())
-    {
-        Serial.println("No nodes in directory.");
-        return;
-    }
-
-    for (const auto &entry : nodeDirectory)
-    {
-        Serial.println("Node: " + entry.nodeID +
-                       " | ID: " + String(entry.senderID) +
-                       " | SNR: " + String(entry.snr) +
-                       " | Last Seen: " + String((millis() - entry.lastSeen) / 1000) + " sec ago");
-        ble.sendMessageToUser("Node: " + entry.nodeID +
-                              " | ID: " + String(entry.senderID) +
-                              " | SNR: " + String(entry.snr) +
-                              " | Last Seen: " + String((millis() - entry.lastSeen) / 1000) + " sec ago");
-    }
-}

@@ -29,8 +29,22 @@ void NodeDirectory::updateNeighbourNode(uint16_t neighborId, int snr, unsigned l
     nodes[selfId].hopCount = 0;
     nodes[selfId].neighbors[neighborId] = { snr, timestamp };
 
+    // Add the edge for visualization directly here
+    // Ensure the edge between the current node and neighbor is created.
+    std::set<std::pair<uint16_t, uint16_t>> addedEdges;
+    auto edge = std::minmax(selfId, neighborId);
+    if (!addedEdges.count(edge)) {
+        addedEdges.insert(edge);
+    }
+
     nodes[neighborId].hopCount = 1;
     nodes[neighborId].neighbors[selfId] = { snr, timestamp };
+
+    // Add the edge for the neighbor side as well
+    auto newEdge = std::minmax(neighborId, selfId);
+    if (!addedEdges.count(newEdge)) {
+        addedEdges.insert(newEdge);
+    }
 }
 
 // merges the directory with another node's directory allowing for nowing 
@@ -92,3 +106,50 @@ std::string NodeDirectory::toVisJson() const {
     serializeJson(doc, result);
     return result;
 }
+
+std::string NodeDirectory::toJson() const {
+    StaticJsonDocument<4096> doc; // Maybe bigger depending on your network
+
+    for (const auto& [nodeId, info] : nodes) {
+        JsonObject nodeObj = doc.createNestedObject(String(nodeId));
+        nodeObj["hopCount"] = info.hopCount;
+
+        JsonObject neighbors = nodeObj.createNestedObject("neighbors");
+        for (const auto& [neighborId, link] : info.neighbors) {
+            JsonObject neighbor = neighbors.createNestedObject(String(neighborId));
+            neighbor["snr"] = link.snr;
+            neighbor["timestamp"] = link.lastSeen; // Use lastSeen for timestamp
+        }
+    }
+
+    std::string result;
+    serializeJson(doc, result);
+    return result;
+}
+
+void NodeDirectory::fromJson(const std::string& json) {
+    StaticJsonDocument<4096> doc;
+    deserializeJson(doc, json);
+
+    nodes.clear(); // Clear old data
+
+    for (JsonPair node : doc.as<JsonObject>()) {
+        uint16_t nodeId = String(node.key().c_str()).toInt();
+        JsonObject nodeObj = node.value();
+        NodeInfo info;
+        info.hopCount = nodeObj["hopCount"] | 255; // default invalid hop count if missing
+
+        JsonObject neighbors = nodeObj["neighbors"];
+        for (JsonPair neighbor : neighbors) {
+            uint16_t neighborId = String(neighbor.key().c_str()).toInt();
+            JsonObject neighborObj = neighbor.value();
+            LinkInfo link;
+            link.snr = neighborObj["snr"] | 0;
+            link.lastSeen = neighborObj["timestamp"] | 0; // default invalid timestamp if missing
+            info.neighbors[neighborId] = link;
+        }
+
+        nodes[nodeId] = info;
+    }
+}
+

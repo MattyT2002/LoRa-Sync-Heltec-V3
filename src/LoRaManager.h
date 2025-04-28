@@ -1,51 +1,46 @@
 #ifndef LORAMESH_H
 #define LORAMESH_H
 
-#include <Arduino.h>
-#include <RadioLib.h>
+
+#include "LoRaManager.h"
 #include <vector>
-#include "Config.h" // Include the configuration file
+#include <String.h>
+#include "Packet.h"
+#include "NodeDirectory.h"
 
-extern Module radio;
-
-
-
-
-
-// Node Entry Structure
-struct NodeEntry {
+// Node structure to hold information about each node
+struct Node {
     String nodeID;
     int senderID;
     float snr;
     unsigned long lastSeen;
 };
 
-class LoRaMesh {
+
+
+// LoRaMesh class to manage LoRa communication and BLE interactions
+class LoRaManager {
 public:
-    // Constructor
-    LoRaMesh(String nodeId, int nodeNumber);
-
-    // Public Methods
-    void setupLoRa();
-    void sendHelloPacket();
-    void listenForPackets();
-    void updateDirectory(String senderID, int senderNumber, float snr);
-    void printDirectory();
-    void sendNodeDirectory();
-    void sendMessage(String message);
-    void sendNodeDirectoryToGUI();
-
-    static const unsigned long BROADCAST_INTERVAL = 10000;  // 10 seconds
-    static const unsigned long PRINT_INTERVAL = 20000;      // 20 seconds
+    LoRaManager(String nodeId, int nodeNumber, NodeDirectory& nodeDirectory); // Constructor
+    
+    void setupLoRa(); // Initialize LoRa communication
+    void sendHelloPacket(); // Send "Hello" packet to network
+    void sendMessage(String message); // Send a generic message
+    void listenForPackets(); // Listen for incoming packets
+    void sendNodeDirectory(); // Send the node directory to network
+    void sendNodeDirectoryToGUI(); // Send the node directory to GUI over BLE
+    void updateDirectory(String senderID, int senderNumber, float snr); // Update the node directory
+    
+    
+    
 private:
     String NODE_ID;
     int NODE_NUMBER;
-    std::vector<NodeEntry> nodeDirectory;
     unsigned long lastBroadcast;
     unsigned long lastPrint;
-
-    int state; // current state of the radio
-
-    static void onReceive(uint8_t *buffer, uint16_t size);
+    NodeDirectory& nodeDirectory; // Reference to the node directory
+   
+    Packet packetManager; // Handles packet management
 };
-#endif  // LORAMESH_H
+
+#endif // LORAMESH_H
