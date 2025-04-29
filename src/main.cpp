@@ -6,22 +6,31 @@
 #define LED 9
 #define N_NODES 2
 #include "Config.h"
+#include "BLE_Heltec.h"
+BLE_Heltec ble;
 
-#if defined(BOARD_HELTEC)
-    #include "BLE_Heltec.h"
-    BLE_Heltec ble;
-#elif defined(BOARD_NANO33BLE)
-    #include "BLE_Nano33.h"
-    BLE_Nano33 ble;
-#endif
 NodeDirectory nodeDirectory;
-LoRaManager meshNode(NODE_name, NODE_number, nodeDirectory);
+
+LoRaManager meshNode(NODE_name, NODE_number, nodeDirectory, ble);
+
+
+void onBLEMessageReceived(const String& msg)
+{
+    Serial.println("Callback: Web app sent --> " + msg);
+    meshNode.sendMessage(msg);
+    // Example: you could broadcast the message over LoRa
+    // meshNode.sendCustomMessage(msg);
+
+    // Example: Echo back
+    ble.sendMessageToUser("Received: " + msg);
+}
+
 
 void setup() {
     Serial.begin(115200);
     ble.begin(NODE_name);
     ble.setMessageCallback([](const String& message) {
-        Serial.println("Received: " + message);
+        onBLEMessageReceived(message);
     });
     meshNode.setupLoRa();
     nodeDirectory.setSelfId(NODE_number);
@@ -31,7 +40,7 @@ void setup() {
 
 static unsigned long lastBroadcast = 0;
 static unsigned long lastPrint = 0;
-
+static unsigned long lastCleanup = 0;
 
 void loop()
 {
@@ -39,9 +48,12 @@ void loop()
     if (millis() - lastBroadcast > BROADCAST_INTERVAL) {
         meshNode.sendHelloPacket();
         lastBroadcast = millis();
+        
+       
     }
-
+    
     meshNode.listenForPackets();
+
 
     if (millis() - lastPrint > PRINT_INTERVAL) {
         lastPrint = millis();
@@ -50,16 +62,10 @@ void loop()
         ble.sendMessageToUser("Node directory sent!");
        
     }
+    if (millis() - lastCleanup > CLEANUP_INTERVAL) {
+        nodeDirectory.removeStaleNodes(NEIGHBOUR_TIMEOUT);
+        lastCleanup = millis();
+    }
+    delay(100);
 }
 
-// === This function is called automatically when a message is received from Web App ===
-void onBLEMessageReceived(const String& msg)
-{
-    Serial.println("Callback: Web app sent --> " + msg);
-
-    // Example: you could broadcast the message over LoRa
-    // meshNode.sendCustomMessage(msg);
-
-    // Example: Echo back
-    ble.sendMessageToUser("Received: " + msg);
-}

@@ -15,7 +15,7 @@ void BLE_Nano33::begin(const char* deviceName) {
 
     BLEService service(SERVICE_UUID);
     BLECharacteristic characteristic(CHARACTERISTIC_UUID, 
-        BLERead | BLEWrite | BLENotify);
+        BLERead | BLEWrite | BLENotify, 100);
 
     service.addCharacteristic(characteristic);
     BLE.addService(service);

@@ -7,6 +7,7 @@
 #include <String.h>
 #include "Packet.h"
 #include "NodeDirectory.h"
+#include "BLE_Heltec.h" 
 
 // Node structure to hold information about each node
 struct Node {
@@ -21,12 +22,13 @@ struct Node {
 // LoRaMesh class to manage LoRa communication and BLE interactions
 class LoRaManager {
 public:
-    LoRaManager(String nodeId, int nodeNumber, NodeDirectory& nodeDirectory); // Constructor
+    LoRaManager(String nodeId, int nodeNumber, NodeDirectory& nodeDirectory, BLE_Heltec& ble); // Constructor
     
     void setupLoRa(); // Initialize LoRa communication
     void sendHelloPacket(); // Send "Hello" packet to network
     void sendMessage(String message); // Send a generic message
     void listenForPackets(); // Listen for incoming packets
+    void sendDirectory(); // Send the node directory to network
     void sendNodeDirectory(); // Send the node directory to network
     void sendNodeDirectoryToGUI(); // Send the node directory to GUI over BLE
     void updateDirectory(String senderID, int senderNumber, float snr); // Update the node directory
@@ -39,7 +41,7 @@ private:
     unsigned long lastBroadcast;
     unsigned long lastPrint;
     NodeDirectory& nodeDirectory; // Reference to the node directory
-   
+    BLE_Heltec& ble; // Reference to the BLE instance
     Packet packetManager; // Handles packet management
 };
 

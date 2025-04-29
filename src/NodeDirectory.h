@@ -20,8 +20,9 @@ public:
     void setSelfId(uint16_t id);
     uint16_t getSelfId() const;
 
-    void updateNeighbourNode(uint16_t neighborId, int snr, unsigned long timestamp);
+    void updateNeighbourNode(uint16_t neighborId, float snr, unsigned long timestamp);
     void mergeDirectory(const NodeDirectory& other, uint16_t viaNodeId);
+    void removeStaleNodes(unsigned long timeoutMs); 
     void fromJson(const std::string& jsonPayload);
     void toJson(std::string& jsonPayload) const;
     std::string toVisJson() const;

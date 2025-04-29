@@ -4,8 +4,7 @@
 #include "nodeManager.h"
 
 SX1262 LoRaRadio = new Module(LORA_NSS, LORA_DIO0, LORA_RST, LORA_DIO1); // NSS, DIO0, RESET, DIO1 pins
-NodeManager nodeManager; // NodeManager instance to manage nodes
-// Global instance for callback function access
+
 LoRaManager *instancePtr = nullptr;
 
 
@@ -17,8 +16,8 @@ Packet recievedPacket;
 Packet msgPacket; // Packet to send
 
 
-LoRaManager::LoRaManager(String nodeId, int nodeNumber, NodeDirectory& nodeDirectory) : nodeDirectory(nodeDirectory)
-{
+LoRaManager::LoRaManager(String nodeId, int nodeNumber, NodeDirectory& nodeDirectory, BLE_Heltec& ble) 
+    : nodeDirectory(nodeDirectory), ble(ble) {
     NODE_ID = nodeId;
     NODE_NUMBER = nodeNumber;
     lastBroadcast = 0;
@@ -38,6 +37,7 @@ void LoRaManager::setupLoRa()
     LoRaRadio.setCodingRate(LORA_CODING_RATE);
     LoRaRadio.setSpreadingFactor(LORA_SPREADING_FACTOR);
     LoRaRadio.setOutputPower(LORA_OUTPUT_POWER); 
+    
     if (state == RADIOLIB_ERR_NONE)
     {
         Serial.println(F("success!"));
@@ -82,6 +82,8 @@ void LoRaManager::sendMessage(String message)
 
     msgPacket = Packet(message);
     String msg = msgPacket.messageToSend(message);
+    Serial.print("Sending packet: ");
+    Serial.println(msg);
     int state = LoRaRadio.transmit(msg);
 
     if (state == RADIOLIB_ERR_NONE)
@@ -96,51 +98,97 @@ void LoRaManager::sendMessage(String message)
     delay(10); // Avoid collisions 
 }
 
+void LoRaManager::sendDirectory()
+{
+    Serial.println("Sending full directory update...");
+
+    // Get the current directory as JSON
+    std::string json = nodeDirectory.toJson();
+
+    // Build the DIR_UPDATE packet
+    String dirPacket = packetManager.dirUpdateMessage(String(json.c_str()));
+
+    // Transmit it
+    int state = LoRaRadio.transmit(dirPacket);
+
+    if (state == RADIOLIB_ERR_NONE) {
+        Serial.println("Directory update sent successfully!");
+    } else {
+        Serial.print("Directory update failed, error: ");
+        Serial.println(state);
+    }
+}
+
 void LoRaManager::listenForPackets()
 {
-    Serial.print(F("[SX1262] Waiting for incoming transmission ... "));
+    
 
     String str;
     int state = LoRaRadio.receive(str);
-    
-    recievedPacket = Packet(str);
+
     if (state == RADIOLIB_ERR_NONE)
     {
         Serial.println(F("success!"));
         Serial.print(F("[SX1262] Data:\t"));
         Serial.println(str);
 
-        Serial.print(F("[SX1262] RSSI:\t"));
-        Serial.print(LoRaRadio.getRSSI());
-        Serial.println(F(" dBm"));
+        if (str.startsWith("DIR_UPDATE|")) {
+            Serial.println("Received a directory update!");
 
-        Serial.print(F("[SX1262] SNR:\t"));
-        Serial.print(LoRaRadio.getSNR());
-        Serial.println(F(" dB"));
+            // Split the string: DIR_UPDATE|senderNode|{JSON}
+            int firstSep = str.indexOf('|');
+            int secondSep = str.indexOf('|', firstSep + 1);
 
-        Serial.print(F("[SX1262] Frequency error:\t"));
-        Serial.print(LoRaRadio.getFrequencyError());
-        Serial.println(F(" Hz"));
+            if (firstSep != -1 && secondSep != -1) {
+                String senderNodeStr = str.substring(firstSep + 1, secondSep);
+                String jsonPayload = str.substring(secondSep + 1);
 
-        // Process received packet
-        recievedPacket = Packet(str);
-        if (recievedPacket.deserialize(str))
-        {
-            Serial.println("Received valid packet!");
-            String senderName = recievedPacket.getnodeName();
-            String senderNumber = recievedPacket.getnodeNumber();
-            float snr = LoRaRadio.getSNR();
-            
-            nodeDirectory.updateNeighbourNode(senderNumber.toInt(), snr, millis());
+                uint16_t senderNodeId = senderNodeStr.toInt();
+
+                Serial.print("Sender Node ID: ");
+                Serial.println(senderNodeId);
+
+                Serial.println("Merging received directory...");
+
+                NodeDirectory receivedDirectory;
+                receivedDirectory.fromJson(jsonPayload.c_str());
+
+                nodeDirectory.mergeDirectory(receivedDirectory, senderNodeId);
+
+                Serial.println("Directory merge complete!");
+            }
+            else {
+                Serial.println("Invalid DIR_UPDATE format!");
+            }
         }
-        else
-        {
-            Serial.println("Received invalid packet!");
+        else {
+            recievedPacket = Packet(str);
+            if (recievedPacket.deserialize(str)) {
+                Serial.println("Received valid packet!");
+                String senderName = recievedPacket.getnodeName();
+                String senderNumber = recievedPacket.getnodeNumber();
+                float snr = LoRaRadio.getSNR();
+                nodeDirectory.updateNeighbourNode(senderNumber.toInt(), snr, millis());
+                if(recievedPacket.getMessageType(str) ="MESSAGE") {
+                    if(recievedPacket.getDestinationNode(str) = NODE_number) {
+                        Serial.println("Received MESSAGE packet!");
+                        // Send the message to the user via BLE
+                        ble.sendMessageToUser(recievedPacket.getPayload(str));
+                    } else {
+                        Serial.println("Message not for this node.");
+
+                    }
+                } else if(recievedPacket.getPacketType() = "MESSAGE_Hop") {
+                    
+                }
+            } else {
+                Serial.println("Received invalid packet!");
+            }
         }
     }
     else if (state == RADIOLIB_ERR_RX_TIMEOUT)
     {
-        Serial.println(F("timeout!"));
+        
     }
     else if (state == RADIOLIB_ERR_CRC_MISMATCH)
     {
@@ -151,7 +199,8 @@ void LoRaManager::listenForPackets()
         Serial.print(F("failed, code "));
         Serial.println(state);
     }
-
 }
+
+
 
 

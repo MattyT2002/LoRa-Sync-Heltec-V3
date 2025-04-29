@@ -1,6 +1,7 @@
 #include "NodeDirectory.h"
 #include <ArduinoJson.h>
 #include <set>
+#include <vector>
 NodeDirectory::NodeDirectory() : selfId(0) {}
 
 void NodeDirectory::setSelfId(uint16_t id) {
@@ -24,53 +25,91 @@ const NodeInfo* NodeDirectory::getNode(uint16_t nodeId) const {
 const std::map<uint16_t, NodeInfo>& NodeDirectory::getAllNodes() const {
     return nodes;
 }
-// updates the directory based on information from a neighbor node
-void NodeDirectory::updateNeighbourNode(uint16_t neighborId, int snr, unsigned long timestamp) {
-    nodes[selfId].hopCount = 0;
-    nodes[selfId].neighbors[neighborId] = { snr, timestamp };
 
-    // Add the edge for visualization directly here
-    // Ensure the edge between the current node and neighbor is created.
-    std::set<std::pair<uint16_t, uint16_t>> addedEdges;
-    auto edge = std::minmax(selfId, neighborId);
-    if (!addedEdges.count(edge)) {
-        addedEdges.insert(edge);
+// updates the directory based on information from a neighbor node
+void NodeDirectory::updateNeighbourNode(uint16_t neighbourNodeId, float snr, unsigned long timeLastSeen)
+{
+    // Make sure self node exists
+    if (!hasNode(selfId)) {
+        nodes[selfId] = NodeInfo();
+        nodes[selfId].hopCount = 0;
     }
 
-    nodes[neighborId].hopCount = 1;
-    nodes[neighborId].neighbors[selfId] = { snr, timestamp };
+    // Update or add the neighbor link
+    LinkInfo link;
+    link.snr = snr;
+    link.lastSeen = timeLastSeen;
 
-    // Add the edge for the neighbor side as well
-    auto newEdge = std::minmax(neighborId, selfId);
-    if (!addedEdges.count(newEdge)) {
-        addedEdges.insert(newEdge);
+    nodes[selfId].neighbors[neighbourNodeId] = link;
+
+    
+    if (!hasNode(neighbourNodeId)) {
+        nodes[neighbourNodeId] = NodeInfo();
     }
 }
 
-// merges the directory with another node's directory allowing for nowing 
-// the path to nodes more than one hop away
+
 void NodeDirectory::mergeDirectory(const NodeDirectory& other, uint16_t viaNodeId) {
     unsigned long now = millis();
     const int estimatedSNR = 0;
 
+    // Iterate through the nodes in the other directory
     for (const auto& [nodeId, info] : other.getAllNodes()) {
         if (nodeId == selfId) continue;
 
-        int hopThroughVia = info.hopCount + 1;
-
-        if (!hasNode(nodeId) || hopThroughVia < nodes[nodeId].hopCount) {
-            nodes[nodeId].hopCount = hopThroughVia;
-            nodes[nodeId].neighbors[viaNodeId] = { estimatedSNR, now };
-            nodes[viaNodeId].neighbors[nodeId] = { estimatedSNR, now };
+        // If the node is not present, add it
+        if (!hasNode(nodeId)) {
+            nodes[nodeId] = info;
         }
 
-        
+        // Propagate the edges (neighbors) from the other node to this node
         for (const auto& [neighborId, link] : info.neighbors) {
-            if (neighborId == selfId) continue;
-            nodes[nodeId].neighbors[neighborId] = link;
+            // Ensure bidirectional propagation of edges
+            nodes[nodeId].neighbors[neighborId] = link;      // Add the link to the current node
+            nodes[neighborId].neighbors[nodeId] = link;      // Add the reverse link to the neighbor
+        }
+
+        // Also propagate the neighbors from this node to all other nodes
+        for (const auto& [neighborId, link] : info.neighbors) {
+            if (nodeId != selfId) {
+                nodes[nodeId].neighbors[neighborId] = link;  // Add the link to the node itself
+                nodes[neighborId].neighbors[nodeId] = link;  // Add reverse link
+            }
         }
     }
 }
+
+
+
+void NodeDirectory::removeStaleNodes(unsigned long timeoutMs)
+{
+    unsigned long now = millis();
+    std::vector<std::pair<uint16_t, uint16_t>> toRemove;
+
+    // Find stale neighbor links
+    for (auto& [nodeId, nodeInfo] : nodes) {
+        for (auto& [neighborId, link] : nodeInfo.neighbors) {
+            if (now - link.lastSeen > timeoutMs) {
+                toRemove.emplace_back(nodeId, neighborId);
+            }
+        }
+    }
+
+    // Remove them after iterating (can't modify while looping)
+    for (auto& [nodeId, neighborId] : toRemove) {
+        nodes[nodeId].neighbors.erase(neighborId);
+    }
+
+    // Optionally, you could also delete nodes that have no neighbors left
+    for (auto it = nodes.begin(); it != nodes.end(); ) {
+        if (it->second.neighbors.empty() && it->first != selfId) {
+            it = nodes.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
 // converts the directory to a JSON format for visualization
 std::string NodeDirectory::toVisJson() const {
     StaticJsonDocument<2048> doc;
@@ -90,7 +129,7 @@ std::string NodeDirectory::toVisJson() const {
         for (const auto& [toId, link] : info.neighbors) {
             if (fromId == toId) continue;
 
-            auto edge = std::minmax(fromId, toId);
+            auto edge = std::make_pair(std::min(fromId, toId), std::max(fromId, toId));
             if (addedEdges.count(edge)) continue;
 
             JsonObject jEdge = jEdges.createNestedObject();

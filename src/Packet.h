@@ -9,6 +9,7 @@ public:
         HELLO,
         DIR_UPDATE,
         MESSAGE,
+        MESSAGE_Hop,
         UNKNOWN
     };
 
@@ -23,9 +24,13 @@ public:
     String dirUpdateMessage(const String& updatePayload);
     String messageToSend(const String& payload) const;
     String getnodeNumber() const;
-    String getPayload() const;
+    String getPayload(const String& data) const;
+    String getMessageType(const String &data) const;
     String getnodeName() const;
+    String getPacketType() const;
     String serializeDirectory(const NodeDirectory& directory) const;
+    String getDestinationNode(const String& data) const;
+
     bool deserializeDirectory(NodeDirectory& directory, const String& jsonPayload) const;
     bool deserialize(const String& data);
 
