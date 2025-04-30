@@ -66,6 +66,5 @@ void loop()
         nodeDirectory.removeStaleNodes(NEIGHBOUR_TIMEOUT);
         lastCleanup = millis();
     }
-    delay(100);
+    
 }
-

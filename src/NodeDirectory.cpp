@@ -81,29 +81,31 @@ void NodeDirectory::mergeDirectory(const NodeDirectory& other, uint16_t viaNodeI
 
 
 
-void NodeDirectory::removeStaleNodes(unsigned long timeoutMs)
-{
+void NodeDirectory::removeStaleNodes(unsigned long timeoutMs) {
     unsigned long now = millis();
-    std::vector<std::pair<uint16_t, uint16_t>> toRemove;
+    std::vector<uint16_t> toRemove;
 
-    // Find stale neighbor links
+    // Check all nodes for stale neighbors
     for (auto& [nodeId, nodeInfo] : nodes) {
+        // Check neighbors for timeout
         for (auto& [neighborId, link] : nodeInfo.neighbors) {
             if (now - link.lastSeen > timeoutMs) {
-                toRemove.emplace_back(nodeId, neighborId);
+                toRemove.push_back(neighborId); // Mark neighbor for removal
             }
         }
     }
 
-    // Remove them after iterating (can't modify while looping)
-    for (auto& [nodeId, neighborId] : toRemove) {
-        nodes[nodeId].neighbors.erase(neighborId);
+    // Remove stale neighbors
+    for (auto& nodeId : toRemove) {
+        for (auto& [key, nodeInfo] : nodes) {
+            nodeInfo.neighbors.erase(nodeId); // Remove stale link from all nodes
+        }
     }
 
-    // Optionally, you could also delete nodes that have no neighbors left
+    // Remove nodes that no longer have neighbors and are not the self node
     for (auto it = nodes.begin(); it != nodes.end(); ) {
-        if (it->second.neighbors.empty() && it->first != selfId) {
-            it = nodes.erase(it);
+        if (it->first != selfId && it->second.neighbors.empty()) {
+            it = nodes.erase(it); // Remove node
         } else {
             ++it;
         }

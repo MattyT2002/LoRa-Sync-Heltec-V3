@@ -9,6 +9,7 @@
 #include "NodeDirectory.h"
 #include "BLE_Heltec.h" 
 
+#define MAX_FRAGMENT_SIZE 140
 // Node structure to hold information about each node
 struct Node {
     String nodeID;
@@ -28,10 +29,9 @@ public:
     void sendHelloPacket(); // Send "Hello" packet to network
     void sendMessage(String message); // Send a generic message
     void listenForPackets(); // Listen for incoming packets
-    void sendDirectory(); // Send the node directory to network
-    void sendNodeDirectory(); // Send the node directory to network
-    void sendNodeDirectoryToGUI(); // Send the node directory to GUI over BLE
-    void updateDirectory(String senderID, int senderNumber, float snr); // Update the node directory
+    void processMessage(const String &str);
+    void sendDirectory();     // Send the node directory to network
+    
     
     
     
