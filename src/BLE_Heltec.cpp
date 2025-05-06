@@ -22,8 +22,6 @@ void BLE_Heltec::MyServerCallbacks::onWrite(BLECharacteristic* pCharacteristic) 
         ble.messageCallback(received);
     }
 
-    pCharacteristic->setValue(received.c_str());
-    pCharacteristic->notify();
 }
 
 void BLE_Heltec::begin(const char* deviceName) {

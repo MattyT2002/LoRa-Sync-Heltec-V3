@@ -53,28 +53,18 @@ void NodeDirectory::mergeDirectory(const NodeDirectory& other, uint16_t viaNodeI
     unsigned long now = millis();
     const int estimatedSNR = 0;
 
-    // Iterate through the nodes in the other directory
     for (const auto& [nodeId, info] : other.getAllNodes()) {
-        if (nodeId == selfId) continue;
+        if (nodeId == selfId) continue;  // Skip self node
 
-        // If the node is not present, add it
+        // Add the node if it doesn't already exist in this directory
         if (!hasNode(nodeId)) {
             nodes[nodeId] = info;
         }
 
-        // Propagate the edges (neighbors) from the other node to this node
+        // Propagate the neighbor links from the other node to this node and vice versa
         for (const auto& [neighborId, link] : info.neighbors) {
-            // Ensure bidirectional propagation of edges
-            nodes[nodeId].neighbors[neighborId] = link;      // Add the link to the current node
-            nodes[neighborId].neighbors[nodeId] = link;      // Add the reverse link to the neighbor
-        }
-
-        // Also propagate the neighbors from this node to all other nodes
-        for (const auto& [neighborId, link] : info.neighbors) {
-            if (nodeId != selfId) {
-                nodes[nodeId].neighbors[neighborId] = link;  // Add the link to the node itself
-                nodes[neighborId].neighbors[nodeId] = link;  // Add reverse link
-            }
+            nodes[nodeId].neighbors[neighborId] = link;      // Add the link to this node's neighbors
+            nodes[neighborId].neighbors[nodeId] = link;      // Add the reverse link to the neighbor's neighbors
         }
     }
 }
@@ -85,27 +75,26 @@ void NodeDirectory::removeStaleNodes(unsigned long timeoutMs) {
     unsigned long now = millis();
     std::vector<uint16_t> toRemove;
 
-    // Check all nodes for stale neighbors
+    // Check neighbors of each node for stale connections
     for (auto& [nodeId, nodeInfo] : nodes) {
-        // Check neighbors for timeout
         for (auto& [neighborId, link] : nodeInfo.neighbors) {
             if (now - link.lastSeen > timeoutMs) {
-                toRemove.push_back(neighborId); // Mark neighbor for removal
+                toRemove.push_back(neighborId); // Mark stale neighbor for removal
             }
         }
     }
 
-    // Remove stale neighbors
+    // Remove stale links from all nodes
     for (auto& nodeId : toRemove) {
         for (auto& [key, nodeInfo] : nodes) {
             nodeInfo.neighbors.erase(nodeId); // Remove stale link from all nodes
         }
     }
 
-    // Remove nodes that no longer have neighbors and are not the self node
+    // Remove nodes that no longer have neighbors, except for self node
     for (auto it = nodes.begin(); it != nodes.end(); ) {
         if (it->first != selfId && it->second.neighbors.empty()) {
-            it = nodes.erase(it); // Remove node
+            it = nodes.erase(it); // Remove node without neighbors
         } else {
             ++it;
         }

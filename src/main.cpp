@@ -18,11 +18,9 @@ void onBLEMessageReceived(const String& msg)
 {
     Serial.println("Callback: Web app sent --> " + msg);
     meshNode.sendMessage(msg);
-    // Example: you could broadcast the message over LoRa
-    // meshNode.sendCustomMessage(msg);
+    
 
-    // Example: Echo back
-    ble.sendMessageToUser("Received: " + msg);
+
 }
 
 
