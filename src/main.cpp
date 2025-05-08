@@ -17,7 +17,9 @@ LoRaManager meshNode(NODE_name, NODE_number, nodeDirectory, ble);
 void onBLEMessageReceived(const String& msg)
 {
     Serial.println("Callback: Web app sent --> " + msg);
-    meshNode.sendMessage(msg);
+    String destinationNodeString = msg.substring(0, msg.indexOf('|'));
+    int destinationNode = destinationNodeString.toInt();
+    meshNode.sendMessage(msg, destinationNode);
     
 
 
@@ -57,7 +59,7 @@ void loop()
         lastPrint = millis();
         ble.sendMessageToUser(nodeDirectory.toVisJson().c_str());
         Serial.println(nodeDirectory.toVisJson().c_str());
-        ble.sendMessageToUser("Node directory sent!");
+        meshNode.sendDirectory();
        
     }
     if (millis() - lastCleanup > CLEANUP_INTERVAL) {

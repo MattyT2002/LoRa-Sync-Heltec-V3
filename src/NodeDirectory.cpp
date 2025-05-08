@@ -2,6 +2,7 @@
 #include <ArduinoJson.h>
 #include <set>
 #include <vector>
+#include <queue>
 NodeDirectory::NodeDirectory() : selfId(0) {}
 
 void NodeDirectory::setSelfId(uint16_t id) {
@@ -183,3 +184,40 @@ void NodeDirectory::fromJson(const std::string& json) {
     }
 }
 
+int NodeDirectory::getNextHopTo(uint16_t destinationId) const {
+    if (destinationId == selfId) return selfId;
+
+    std::map<uint16_t, uint16_t> previous; // current node -> previous node
+    std::queue<uint16_t> q;
+    std::set<uint16_t> visited;
+
+    q.push(selfId);
+    visited.insert(selfId);
+
+    while (!q.empty()) {
+        uint16_t current = q.front();
+        q.pop();
+
+        auto it = nodes.find(current);
+        if (it == nodes.end()) continue;
+
+        for (const auto& [neighborId, link] : it->second.neighbors) {
+            if (visited.count(neighborId)) continue;
+
+            visited.insert(neighborId);
+            previous[neighborId] = current;
+            q.push(neighborId);
+
+            if (neighborId == destinationId) {
+                // Found destination; backtrack to find next hop
+                uint16_t step = destinationId;
+                while (previous[step] != selfId) {
+                    step = previous[step];
+                }
+                return step;
+            }
+        }
+    }
+
+    return -1; // No path found
+}

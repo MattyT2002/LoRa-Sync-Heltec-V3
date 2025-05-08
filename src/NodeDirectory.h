@@ -24,7 +24,7 @@ public:
     void mergeDirectory(const NodeDirectory& other, uint16_t viaNodeId);
     void removeStaleNodes(unsigned long timeoutMs); 
     void fromJson(const std::string& jsonPayload);
-    void toJson(std::string& jsonPayload) const;
+    int getNextHopTo(uint16_t destinationId) const;
     std::string toVisJson() const;
     std::string toJson() const;
     // Accessors (optional if needed)

@@ -29,8 +29,8 @@ void BLE_Heltec::begin(const char* deviceName) {
     BLEDevice::init(deviceName);
     pServer = BLEDevice::createServer();
 
-    MyServerCallbacks* callbacks = new MyServerCallbacks(*this);
-    pServer->setCallbacks(callbacks);
+    static MyServerCallbacks callbacks(*this);  // static to avoid memory leak
+    pServer->setCallbacks(&callbacks);
 
     BLEService* pService = pServer->createService(SERVICE_UUID);
     pCharacteristic = pService->createCharacteristic(
@@ -41,7 +41,7 @@ void BLE_Heltec::begin(const char* deviceName) {
     );
 
     pCharacteristic->addDescriptor(new BLE2902());
-    pCharacteristic->setCallbacks(callbacks);
+    pCharacteristic->setCallbacks(&callbacks);  
 
     pService->start();
     BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
@@ -54,17 +54,28 @@ void BLE_Heltec::begin(const char* deviceName) {
 void BLE_Heltec::sendMessageToUser(const String& message) {
     if (deviceConnected && pCharacteristic) {
         Serial.println("Sending message to Web App: " + message);
-        int chunkSize = 100;
-        for (int i = 0; i < message.length(); i += chunkSize) {
+        const int chunkSize = 80;
+        char buffer[chunkSize + 1];  // +1 for null terminator
+
+        int msgLen = message.length();
+        for (int i = 0; i < msgLen; i += chunkSize) {
+            // Get substring chunk
             String chunk = message.substring(i, i + chunkSize);
-            pCharacteristic->setValue(chunk.c_str());
+
+            // Safely copy to buffer
+            chunk.toCharArray(buffer, sizeof(buffer));
+
+            // Set and notify
+            pCharacteristic->setValue((uint8_t*)buffer, chunk.length());
             pCharacteristic->notify();
-            delay(50);
+
+            delay(100);  // Allow client to process
         }
     } else {
         Serial.println("No device connected. Cannot send message.");
     }
 }
+
 
 void BLE_Heltec::setMessageCallback(void (*callback)(const String&)) {
     messageCallback = callback;
