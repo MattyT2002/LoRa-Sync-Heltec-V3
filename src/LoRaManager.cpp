@@ -125,7 +125,10 @@ void LoRaManager::listenForPackets()
 {
     String str;
     int state = LoRaRadio.readData(str);
-
+    if (state == RADIOLIB_ERR_NONE && str.length() == 0)
+    {
+        return; // No data received
+    }
     if (state == RADIOLIB_ERR_NONE)
     {
 
@@ -138,6 +141,7 @@ void LoRaManager::listenForPackets()
                 Serial.println("Full message reassembled:");
                 Serial.println(full);
                 processMessage(full);
+                return;
             }
         }
         else
@@ -158,6 +162,8 @@ void LoRaManager::listenForPackets()
 
 void LoRaManager::processMessage(const String &str)
 {
+    Serial.print("ProcessingMessage: ");
+    Serial.println(str);
     if (str.startsWith("DIR_UPDATE|"))
     {
         int firstSep = str.indexOf('|');
@@ -181,11 +187,11 @@ void LoRaManager::processMessage(const String &str)
         {
             String senderNumber = receivedPacket.getnodeNumber();
             float snr = LoRaRadio.getSNR();
-            if (senderNumber != "2")
+            if (senderNumber != IGNORE_NODE)
             {
                 nodeDirectory.updateNeighbourNode(senderNumber.toInt(), snr, millis());
             }
-            if (receivedPacket.getMessageType(str) == "MESSAGE")
+            if (receivedPacket.getMessageType(str) == "MESSAGE|")
             {
                 if (receivedPacket.getDestinationNode(str) == String(NODE_number))
                 {

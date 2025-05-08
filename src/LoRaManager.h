@@ -9,7 +9,7 @@
 #include "NodeDirectory.h"
 #include "BLE_Heltec.h" 
 
-#define MAX_FRAGMENT_SIZE 180
+#define MAX_FRAGMENT_SIZE 200
 // Node structure to hold information about each node
 struct Node {
     String nodeID;

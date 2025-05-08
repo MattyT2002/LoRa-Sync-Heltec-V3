@@ -38,8 +38,8 @@ String Packet::getPayload(const String& data) const {
         if (start == -1) return "";
         count++;
     }
-    // start now points to the 3rd '|' — the delimiter before the destination node
-    return data.substring(start + 1);  // everything after the 3rd '|'
+    
+    return data.substring(start + 1);  
 }
 
 String Packet::getMessageType(const String& data) const {
