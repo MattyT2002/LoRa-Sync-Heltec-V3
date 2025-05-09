@@ -8,7 +8,7 @@
 #include "Packet.h"
 #include "NodeDirectory.h"
 #include "BLE_Heltec.h" 
-
+#include "FragmentedMessageManager.h"
 #define MAX_FRAGMENT_SIZE 200
 // Node structure to hold information about each node
 struct Node {
@@ -42,6 +42,7 @@ private:
     NodeDirectory& nodeDirectory; // Reference to the node directory
     BLE_Heltec& ble; // Reference to the BLE instance
     Packet packetManager; // Handles packet management
+    FragmentedMessageManager fragmentManager; // Handles fragmented messages
 };
 
 #endif // LORAMESH_H

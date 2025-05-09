@@ -30,6 +30,7 @@ const std::map<uint16_t, NodeInfo>& NodeDirectory::getAllNodes() const {
 // updates the directory based on information from a neighbor node
 void NodeDirectory::updateNeighbourNode(uint16_t neighbourNodeId, float snr, unsigned long timeLastSeen)
 {
+    if (neighbourNodeId == 65535 || neighbourNodeId == 0) return; 
     // Make sure self node exists
     if (!hasNode(selfId)) {
         nodes[selfId] = NodeInfo();
