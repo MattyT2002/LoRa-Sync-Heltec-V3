@@ -2,7 +2,7 @@
 #define CONFIG_H
 
 // Device Information
-#define NODE_number 3  
+#define NODE_number 3 
 #define NODE_name  "Node 3 Home"             
 //#define Chip SX1276 //E32 868
 #define Chip SX1262 //helect
@@ -30,7 +30,7 @@
 #define PRINT_INTERVAL 30000 // Interval to print directory in ms
 #define CLEANUP_INTERVAL 120000 // Interval to remove stale nodes in ms
 #define NEIGHBOUR_TIMEOUT 120000 // Timeout for neighbor nodes in ms
-#define IGNORE_NODE "5"
-#define TEST_MESSAGE_DESTINATION 5 // Destination node for test messages
+#define IGNORE_NODE "999"
+#define TEST_MESSAGE_DESTINATION 999 // Destination node for test messages
 
 #endif

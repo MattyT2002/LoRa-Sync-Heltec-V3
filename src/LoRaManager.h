@@ -32,6 +32,7 @@ public:
     void processMessage(const String &str);
     void sendMessageNextHope(const String& msg, int destinationNode);
     void sendDirectory(); // Send the node directory to network
+    void setToReceive(); // Set the node to receive mode
 
 private:
     String NODE_ID;

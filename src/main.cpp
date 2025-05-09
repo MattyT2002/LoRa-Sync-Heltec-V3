@@ -45,15 +45,16 @@ static unsigned long lastCleanup = 0;
 
 void loop()
 {
-     
+    meshNode.setToReceive(); 
     if (millis() - lastBroadcast > BROADCAST_INTERVAL) {
         meshNode.sendHelloPacket();
         lastBroadcast = millis();
         
        
     }
-    
+    delay(2000);
     meshNode.listenForPackets();
+    
 
 
     if (millis() - lastPrint > PRINT_INTERVAL) {
