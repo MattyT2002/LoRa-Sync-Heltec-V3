@@ -78,10 +78,13 @@ void LoRaManager::sendHelloPacket()
 void LoRaManager::sendMessage(String message, int finalDestNode)
 {
     int nextNode = nodeDirectory.getNextHopTo(finalDestNode);
+
+    // Constructing the message with multi-hop info
     String packetStr = "MESSAGE|" + String(NODE_NUMBER) + "|" + String(nextNode) + "|" + String(finalDestNode) + "|" + message;
 
     auto fragments = fragManager.fragmentMessage(packetStr, MAX_FRAGMENT_SIZE);
 
+    // Send each fragment with retry on failure
     for (int i = 0; i < fragments.size(); i++)
     {
         Serial.print("Sending fragment ");
@@ -90,12 +93,13 @@ void LoRaManager::sendMessage(String message, int finalDestNode)
         Serial.println(fragments[i]);
 
         int state = LoRaRadio.transmit(fragments[i]);
-        delay(100);
+        delay(100); // Slight delay between fragments
 
         if (state != RADIOLIB_ERR_NONE)
         {
-            Serial.print("Failed fragment, error: ");
+            Serial.print("Failed to send fragment, error: ");
             Serial.println(state);
+            // Retry sending the fragment, or handle failure
         }
         LoRaRadio.startReceive();
     }
@@ -105,7 +109,8 @@ void LoRaManager::sendDirectory()
 {
     Serial.println("Sending full directory update...");
     std::string json = nodeDirectory.toJson();
-    String dirPacket = packetManager.dirUpdateMessage(String(json.c_str()));
+    String jsonStr = String(json.c_str()); // convert before use
+    String dirPacket = packetManager.dirUpdateMessage(jsonStr);
 
     auto fragments = fragManager.fragmentMessage(dirPacket, MAX_FRAGMENT_SIZE);
     for (auto &frag : fragments)
@@ -162,10 +167,9 @@ void LoRaManager::listenForPackets()
 
 void LoRaManager::processMessage(const String &str)
 {
-    Serial.print("ProcessingMessage: ");
-    Serial.println(str);
     if (str.startsWith("DIR_UPDATE|"))
     {
+        // Handle directory update messages
         int firstSep = str.indexOf('|');
         int secondSep = str.indexOf('|', firstSep + 1);
 
@@ -182,38 +186,64 @@ void LoRaManager::processMessage(const String &str)
     }
     else
     {
+        // Process regular message
         receivedPacket = Packet(str);
         if (receivedPacket.deserialize(str))
         {
             String senderNumber = receivedPacket.getnodeNumber();
             float snr = LoRaRadio.getSNR();
+
             if (senderNumber != IGNORE_NODE)
             {
                 nodeDirectory.updateNeighbourNode(senderNumber.toInt(), snr, millis());
             }
-            if (receivedPacket.getMessageType(str) == "MESSAGE|")
+
+            // Check if the message is for this node
+            if (str.startsWith("MESSAGE|"))
             {
-                if (receivedPacket.getDestinationNode(str) == String(NODE_number))
+                Serial.println("Received message: " + str);
+                int destinationNode = receivedPacket.getDestinationNode(str).toInt();
+                int nextHop = receivedPacket.getNextHop(str).toInt();
+
+                if (destinationNode == NODE_NUMBER)
                 {
+                    Serial.println("Message for me, sending to BLE: " + receivedPacket.getPayload(str));
                     ble.sendMessageToUser(receivedPacket.getPayload(str));
+                }
+                else if (nextHop == NODE_NUMBER)
+                {
+                    Serial.println("Forwarding message to next hop: " + receivedPacket.getPayload(str));
+                    sendMessageNextHope(receivedPacket.getPayload(str), destinationNode);
+                }
+                else
+                {
+                    Serial.println("Message not for me, ignoring.");
                 }
             }
         }
     }
 }
 
-void LoRaManager::sendRawMessage(String msg)
+void LoRaManager::sendMessageNextHope(const String& msg, int destinationNode)
 {
-    auto fragments = fragManager.fragmentMessage(msg, MAX_FRAGMENT_SIZE);
-    for (auto &frag : fragments)
+    int nextNode = nodeDirectory.getNextHopTo(destinationNode);
+    String originalSenderNumber = receivedPacket.getOriginalSender(msg);
+    String finalDestination = receivedPacket.getFinalDestination(msg);
+    String PayloadOnly = receivedPacket.getPayloadOnly(msg);
+    String newMsg = "MESSAGE|" + originalSenderNumber + "|" + String(nextNode) + "|" + finalDestination + "|" + PayloadOnly;
+    Serial.println("Forwarding message: " + newMsg);
     {
-        int state = LoRaRadio.transmit(frag);
-        delay(100);
-        if (state != RADIOLIB_ERR_NONE)
+        auto fragments = fragManager.fragmentMessage(newMsg, MAX_FRAGMENT_SIZE);
+        for (auto &frag : fragments)
         {
-            Serial.print("Forwarding failed, error: ");
-            Serial.println(state);
+            int state = LoRaRadio.transmit(frag);
+            delay(100);
+            if (state != RADIOLIB_ERR_NONE)
+            {
+                Serial.print("Forwarding failed, error: ");
+                Serial.println(state);
+            }
+            
         }
-        LoRaRadio.startReceive();
     }
 }

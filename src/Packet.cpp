@@ -14,9 +14,7 @@ String Packet::dirUpdateMessage(const String& updatePayload) {
     return "DIR_UPDATE|" + String(NODE_number) + "|" + updatePayload;
 }
 
-String Packet::messageToSend(const String& payload) const {
-    return "MESSAGE|" NODE_name "|" + String(NODE_number) + "|" + payload;
-}
+
 
 String Packet::getnodeName() const {
     return senderName; 
@@ -105,4 +103,38 @@ String Packet::typeToString(Packet::Type type) {
         case DIR_UPDATE: return "DIR_UPDATE";
         default: return "UNKNOWN";
     }
+}
+
+String Packet::getOriginalSender(const String& data) const {
+    int firstSep = data.indexOf('|');
+    int secondSep = data.indexOf('|', firstSep + 1);
+    if (firstSep == -1 || secondSep == -1) return "";
+    return data.substring(firstSep + 1, secondSep);
+}
+
+String Packet::getNextHop(const String& data) const {
+    int firstSep = data.indexOf('|');
+    int secondSep = data.indexOf('|', firstSep + 1);
+    int thirdSep = data.indexOf('|', secondSep + 1);
+    if (thirdSep == -1) return "";
+    return data.substring(secondSep + 1, thirdSep);
+}
+
+String Packet::getFinalDestination(const String& data) const {
+    int firstSep = data.indexOf('|');
+    int secondSep = data.indexOf('|', firstSep + 1);
+    int thirdSep = data.indexOf('|', secondSep + 1);
+    int fourthSep = data.indexOf('|', thirdSep + 1);
+    if (fourthSep == -1) return "";
+    return data.substring(thirdSep + 1, fourthSep);
+}
+
+String Packet::getPayloadOnly(const String& data) const {
+    int firstSep = data.indexOf('|');
+    int secondSep = data.indexOf('|', firstSep + 1);
+    int thirdSep = data.indexOf('|', secondSep + 1);
+    int fourthSep = data.indexOf('|', thirdSep + 1);
+
+    if (fourthSep == -1 || fourthSep + 1 >= data.length()) return "";
+    return data.substring(fourthSep + 1);
 }

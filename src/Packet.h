@@ -30,6 +30,11 @@ public:
     String getPacketType() const;
     String serializeDirectory(const NodeDirectory& directory) const;
     String getDestinationNode(const String& data) const;
+    String getOriginalSender(const String& data) const;
+String getNextHop(const String& data) const;
+String getFinalDestination(const String& data) const;
+String getPayloadOnly(const String& data) const;
+
 
     bool deserializeDirectory(NodeDirectory& directory, const String& jsonPayload) const;
     bool deserialize(const String& data);

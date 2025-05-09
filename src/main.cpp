@@ -19,6 +19,7 @@ void onBLEMessageReceived(const String& msg)
     Serial.println("Callback: Web app sent --> " + msg);
     String destinationNodeString = msg.substring(0, msg.indexOf('|'));
     int destinationNode = destinationNodeString.toInt();
+    Serial.println("Destination Node: " + String(destinationNode));
     meshNode.sendMessage(msg, destinationNode);
     
 
@@ -65,6 +66,8 @@ void loop()
     if (millis() - lastCleanup > CLEANUP_INTERVAL) {
         nodeDirectory.removeStaleNodes(NEIGHBOUR_TIMEOUT);
         lastCleanup = millis();
+        meshNode.sendMessage("Test",TEST_MESSAGE_DESTINATION);
+
     }
     
 }
