@@ -30,7 +30,7 @@ public:
     void sendMessage(String message, int destinationNode); // Send a generic message
     void listenForPackets(); // Listen for incoming packets
     void processMessage(const String &str);
-    void sendMessageNextHope(const String& msg, int destinationNode);
+    void sendMessageNextHop(const String& msg, int destinationNode);
     void sendDirectory(); // Send the node directory to network
     void setToReceive(); // Set the node to receive mode
 

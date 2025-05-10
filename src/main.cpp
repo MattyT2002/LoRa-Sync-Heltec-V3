@@ -52,7 +52,7 @@ void loop()
         
        
     }
-    delay(2000);
+    delay(5000);
     meshNode.listenForPackets();
     
 
@@ -60,14 +60,16 @@ void loop()
     if (millis() - lastPrint > PRINT_INTERVAL) {
         lastPrint = millis();
         ble.sendMessageToUser(nodeDirectory.toVisJson().c_str());
+        Serial.println("Node Directory before sending to BLE:");
         Serial.println(nodeDirectory.toVisJson().c_str());
+        
         meshNode.sendDirectory();
        
     }
     if (millis() - lastCleanup > CLEANUP_INTERVAL) {
         nodeDirectory.removeStaleNodes(NEIGHBOUR_TIMEOUT);
         lastCleanup = millis();
-        meshNode.sendMessage("Test",TEST_MESSAGE_DESTINATION);
+        
 
     }
     

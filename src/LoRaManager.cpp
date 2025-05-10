@@ -90,12 +90,14 @@ void LoRaManager::sendDirectory()
     Serial.println("Sending full directory update...");
     std::string json = nodeDirectory.toJson();
     String jsonStr = String(json.c_str());
-    String dirPacket = packetManager.dirUpdateMessage(jsonStr);
+    String compactJson = nodeDirectory.encodeDirectorySimplified();
+    Serial.println("directory: ");
+    Serial.println(jsonStr);
+    Serial.println("sending Serialized directory: ");
+    Serial.println(compactJson);
+    
 
-    Serial.print("Sending directory packet: ");
-    Serial.println(dirPacket);
-
-    int state = LoRaRadio.transmit(dirPacket);
+    int state = LoRaRadio.transmit(compactJson);
     delay(200);
 
     if (state != RADIOLIB_ERR_NONE)
@@ -152,9 +154,9 @@ void LoRaManager::processMessage(const String &str)
             String senderNodeStr = str.substring(firstSep + 1, secondSep);
             String jsonPayload = str.substring(secondSep + 1);
             uint16_t senderNodeId = senderNodeStr.toInt();
-
+            
             NodeDirectory receivedDirectory;
-            receivedDirectory.fromJson(jsonPayload.c_str());
+            receivedDirectory.decodeDirectorySimplified(jsonPayload);
             nodeDirectory.mergeDirectory(receivedDirectory, senderNodeId);
         }
     }
@@ -185,7 +187,7 @@ void LoRaManager::processMessage(const String &str)
                 else if (nextHop == NODE_NUMBER)
                 {
                     Serial.println("Forwarding message to next hop: " + receivedPacket.getPayload(str));
-                    sendMessageNextHope(receivedPacket.getPayload(str), destinationNode);
+                    sendMessageNextHop(receivedPacket.getPayload(str), destinationNode);
                 }
                 else
                 {
@@ -196,7 +198,7 @@ void LoRaManager::processMessage(const String &str)
     }
 }
 
-void LoRaManager::sendMessageNextHope(const String &msg, int destinationNode)
+void LoRaManager::sendMessageNextHop(const String &msg, int destinationNode)
 {
     int nextNode = nodeDirectory.getNextHopTo(destinationNode);
     String originalSenderNumber = receivedPacket.getOriginalSender(msg);

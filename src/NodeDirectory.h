@@ -2,14 +2,14 @@
 #include <Arduino.h>
 #include <map>
 #include <ArduinoJson.h>
-#include "NodeDirectory.h"
+#include "config.h"
 struct LinkInfo {
     int snr;
     unsigned long lastSeen;
 };
 
 struct NodeInfo {
-    int hopCount;
+    
     std::map<uint16_t, LinkInfo> neighbors;
 };
 
@@ -25,6 +25,7 @@ public:
     void removeStaleNodes(unsigned long timeoutMs); 
     void fromJson(const std::string& jsonPayload);
     int getNextHopTo(uint16_t destinationId) const;
+    
     std::string toVisJson() const;
     std::string toJson() const;
     // Accessors (optional if needed)
@@ -32,7 +33,14 @@ public:
     const NodeInfo* getNode(uint16_t nodeId) const;
     const std::map<uint16_t, NodeInfo>& getAllNodes() const;
 
+    
+    void decodeDirectorySimplified(const String &data);
+    String encodeDirectorySimplified();
+
+
 private:
     uint16_t selfId;
     std::map<uint16_t, NodeInfo> nodes;
 };
+
+
